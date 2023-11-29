@@ -5,8 +5,7 @@ numpy
 pandas       
 scikit-learn 
 seaborn
-# Si vous effectuez l'entraînement localement
-# torch
-# transformers
-# datasets
-# accelerate
+torch
+transformers
+datasets
+accelerate
