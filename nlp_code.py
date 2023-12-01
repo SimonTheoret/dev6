@@ -5,7 +5,7 @@ import numpy as np
 import string
 from collections import Counter
 from lime.lime_text import LimeTextExplainer
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import LabelEncoder
 
 from nltk.corpus import stopwords
@@ -39,6 +39,7 @@ def preprocess_text(text) -> str:
     text = re.sub(CLEANR, "", text)
 
     # Suppression de la ponctuation : Éliminer les signes de ponctuation. Se fait plus tard, avec les tokens!
+    text = re.sub(r'[^\w\d\s\']+', ' ', text)
     # text = [s for s in text if s not in string.punctuation]
     # text = " ".join(text)
 
@@ -48,18 +49,14 @@ def preprocess_text(text) -> str:
     # Minuscules : Convertir les mots en minuscules
     tokens = [token.lower() for token in tokens]
 
-    # Suppression des stopwords : Supprimer les stopwords courants (élimine aussi ponctuation)
-    tokens = [
-        word
-        for word in tokens
-        if word not in stopwords_english and word not in string.punctuation
-    ]
+    # Suppression des stopwords : Supprimer les stopwords courants
+    tokens = [word for word in tokens if word not in stopwords_english and word not in string.punctuation]
 
     # Lemmatisation : Appliquer la lemmatisation pour réduire les mots à leur forme de base
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
 
     # Nettoyage des données : Supprimer les jetons vides et effectuer tout nettoyage supplémentaire
-    tokens = [token for token in tokens if token != ""]
+    tokens = [token for token in tokens if token != "" and token != " "]
 
     # Joindre les jetons nettoyés pour former un texte traité
     text = " ".join(tokens)
@@ -77,11 +74,14 @@ def review_lengths(df) -> pd.Series:
     Renvois:
     - pd.Series: Une série Pandas contenant le décompte de mots pour chaque élément de la série d'entrée.
     """
+
     # Diviser le texte en mots et calculer le nombre de mots.
-    def n_word(text: str)-> int:
+    def n_word(text: str) -> int:
         return len(word_tokenize(text))
+
     res = df.map(n_word)
     return res
+
 
 def word_frequency(df) -> pd.Series:
     """
@@ -102,9 +102,11 @@ def word_frequency(df) -> pd.Series:
     def count_word(text: str):
         words = word_tokenize(text)
         c.update(words)
+
     df.map(count_word)
-    res = pd.Series(dict(c)).sort_values()
+    res = pd.Series(dict(c)).sort_values(ascending = False)
     return res
+
 
 def encode_sentiment(df, sentiment_column="sentiment") -> pd.DataFrame:
     """
@@ -118,9 +120,12 @@ def encode_sentiment(df, sentiment_column="sentiment") -> pd.DataFrame:
     - pd.DataFrame: Un nouveau DataFrame avec la colonne de sentiment encodée en valeurs numériques.
     """
     df = df.copy()
+    df[sentiment_column] = df[sentiment_column].map(
+        lambda x: 1 if x == "positive" else 0
+    )
     # Encoder nos étiquettes cibles en étiquettes numériques.
 
-    return None
+    return df
 
 
 def explain_instance(
@@ -142,13 +147,26 @@ def explain_instance(
     """
 
     # Créer un pipeline avec le vectoriseur et le modèle entraînés
-
+    #
+    X_test = X_test.copy()
+    X_test = tfidf_vectorizer.transform(X_test[idx])
+    print(X_test)
+    pipe = make_pipeline(naive_bayes_classifier)
+    # pipe = Pipeline(
+    #     [
+    #         ("vect", tfidf_vectorizer),
+    #         ("clf", naive_bayes_classifier)
+    #     ]
+    # )
     # Spécifier les noms de classe
-
+    classes = {1: "positive", 0: "negative"}
     # Créer un LimeTextExplainer
-
+    exp = LimeTextExplainer(class_names=classes)
     # Expliquer l'instance à l'index spécifié
+    explanation = exp.explain_instance(
+        X_test[idx], pipe.predict_proba, num_features=num_features
+    )
+    # # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
+    proba = round(pipe.predict_proba(X_test[idx]), 4)
 
-    # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
-
-    return None, None
+    return explanation, proba
