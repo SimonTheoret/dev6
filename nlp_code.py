@@ -2,7 +2,6 @@ import pandas as pd
 import nltk
 import re
 import numpy as np
-import string
 from collections import Counter
 from lime.lime_text import LimeTextExplainer
 from sklearn.pipeline import Pipeline, make_pipeline
@@ -35,14 +34,10 @@ def preprocess_text(text) -> str:
 
     # Supprimer HTML
     # Solution utilisant regex provient de https://stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string.
-    CLEANR = re.compile("<.*?>")
-    text = re.sub(CLEANR, "", text)
+    text = re.sub('<[^<]+?>', ' ', text)
 
-    # Suppression de la ponctuation : Éliminer les signes de ponctuation. Se fait plus tard, avec les tokens!
-    text = re.sub(r'[^\w\d\s\']+', ' ', text)
-    # text = [s for s in text if s not in string.punctuation]
-    # text = " ".join(text)
-
+    # Suppression de la ponctuation : Éliminer les signes de ponctuation
+    text = re.sub(r'[^\w\s]', ' ', text)
     # Tokenisation : Diviser le texte en mots
     tokens = word_tokenize(text)
 
@@ -50,7 +45,7 @@ def preprocess_text(text) -> str:
     tokens = [token.lower() for token in tokens]
 
     # Suppression des stopwords : Supprimer les stopwords courants
-    tokens = [word for word in tokens if word not in stopwords_english and word not in string.punctuation]
+    tokens = [word for word in tokens if word not in stopwords_english]
 
     # Lemmatisation : Appliquer la lemmatisation pour réduire les mots à leur forme de base
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
@@ -147,26 +142,22 @@ def explain_instance(
     """
 
     # Créer un pipeline avec le vectoriseur et le modèle entraînés
-    #
-    X_test = X_test.copy()
-    X_test = tfidf_vectorizer.transform(X_test[idx])
-    print(X_test)
-    pipe = make_pipeline(naive_bayes_classifier)
-    # pipe = Pipeline(
-    #     [
-    #         ("vect", tfidf_vectorizer),
-    #         ("clf", naive_bayes_classifier)
-    #     ]
-    # )
+
+    pipe = make_pipeline(tfidf_vectorizer, naive_bayes_classifier)
+
     # Spécifier les noms de classe
-    classes = {1: "positive", 0: "negative"}
+    class_names = ["positive", "negative"]
+
     # Créer un LimeTextExplainer
-    exp = LimeTextExplainer(class_names=classes)
+    exp = LimeTextExplainer(class_names=class_names)
+    # print(X_test)
+
     # Expliquer l'instance à l'index spécifié
     explanation = exp.explain_instance(
         X_test[idx], pipe.predict_proba, num_features=num_features
     )
-    # # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
+
+    # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
     proba = round(pipe.predict_proba(X_test[idx]), 4)
 
     return explanation, proba
