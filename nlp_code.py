@@ -156,8 +156,7 @@ def explain_instance(
     explanation = exp.explain_instance(
         X_test[idx], pipe.predict_proba, num_features=num_features
     )
-
-    # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
-    proba = round(pipe.predict_proba(X_test[idx]), 4)
+    # # Calculer la probabilité que l'instance soit classée comme 'positive'. Arrondir le résultat à 4 chiffres après la virgule.
+    proba = round(pipe.predict_proba([ X_test[idx] ])[0][1], 4)
 
     return explanation, proba
